@@ -76,6 +76,10 @@
 
 #include <sqlite3.h>
 
+#ifdef USE_VTUNE_INSTRUMENTATION
+#include <ittnotify.h>
+#endif
+
 #ifdef EMBED_RESOURCE_FILES
 #include "embedded_resources.h"
 #endif
@@ -836,6 +840,9 @@ struct DatabaseContext::Private {
   private:
     friend class DatabaseContext;
 
+    SQLResultSet run_(const std::string &sql, const ListOfParams &parameters,
+                      bool useMaxFloatPrecision);
+
     // This is a manual implementation of std::enable_shared_from_this<> that
     // avoids publicly deriving from it.
     std::weak_ptr<DatabaseContext> self_{};
@@ -1415,9 +1422,9 @@ void DatabaseContext::Private::attachExtraDatabases(
 
 // ---------------------------------------------------------------------------
 
-SQLResultSet DatabaseContext::Private::run(const std::string &sql,
-                                           const ListOfParams &parameters,
-                                           bool useMaxFloatPrecision) {
+SQLResultSet DatabaseContext::Private::run_(const std::string &sql,
+                                            const ListOfParams &parameters,
+                                            bool useMaxFloatPrecision) {
 
     auto l_handle = handle();
     assert(l_handle);
@@ -1444,6 +1451,25 @@ SQLResultSet DatabaseContext::Private::run(const std::string &sql,
     ++queryCounter_;
 
     return l_handle->run(stmt, sql, parameters, useMaxFloatPrecision);
+}
+
+SQLResultSet DatabaseContext::Private::run(const std::string &sql,
+                                           const ListOfParams &parameters,
+                                           bool useMaxFloatPrecision) {
+#ifdef USE_VTUNE_INSTRUMENTATION
+    static const auto *domain =
+        __itt_domain_create("DatabaseContext::Private::run");
+    auto *handle = __itt_string_handle_create(sql.c_str());
+    __itt_task_begin(domain, __itt_null, __itt_null, handle);
+
+    auto result = run_(sql, parameters, useMaxFloatPrecision);
+
+    __itt_task_end(domain);
+
+    return result;
+#else
+    return run_(sql, parameters, useMaxFloatPrecision);
+#endif
 }
 
 // ---------------------------------------------------------------------------
