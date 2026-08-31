@@ -158,6 +158,18 @@ struct SQLValues {
     // cppcheck-suppress functionStatic
     double doubleValue() const { return double_; }
 
+    [[nodiscard]] std::string toString() const {
+        switch (type_) {
+        case Type::STRING:
+            return str_;
+        case Type::INT:
+            return internal::toString(int_);
+        case Type::DOUBLE:
+            return internal::toString(double_);
+        }
+        return {};
+    }
+
   private:
     Type type_;
     std::string str_{};
@@ -1456,6 +1468,30 @@ SQLResultSet DatabaseContext::Private::run_(const std::string &sql,
 SQLResultSet DatabaseContext::Private::run(const std::string &sql,
                                            const ListOfParams &parameters,
                                            bool useMaxFloatPrecision) {
+    // (PJ_LOG_TRACE) Check if this is a select query and explain it.
+    if (pjCtxt()->debug_level >= PJ_LOG_TRACE &&
+        ci_starts_with(sql, "SELECT")) {
+        // Escape percent signs and log the query
+        pj_log(pjCtxt(), PJ_LOG_TRACE,
+               ("Query: " + replaceAll(sql, "%", "%%")).c_str());
+
+        std::vector<std::string> parameterStrings;
+        std::transform(parameters.begin(), parameters.end(),
+                       std::back_inserter(parameterStrings),
+                       [](const SQLValues &param) { return param.toString(); });
+        pj_log(pjCtxt(), PJ_LOG_TRACE,
+               ("Query parameters: (" + join(parameterStrings, ", ") + ")")
+                   .c_str());
+
+        // Log the sqlite explaination of this query
+        std::string explainSql = "EXPLAIN QUERY PLAN " + sql;
+        auto result = run_(explainSql, parameters, useMaxFloatPrecision);
+        std::string explanation("Query plan:\n");
+        for (auto &row : result)
+            explanation += join(row, ", ") + '\n';
+        pj_log(pjCtxt(), PJ_LOG_TRACE, explanation.c_str());
+    }
+
 #ifdef USE_VTUNE_INSTRUMENTATION
     static const auto *domain =
         __itt_domain_create("DatabaseContext::Private::run");
