@@ -307,6 +307,25 @@ if(ENABLE_EMSCRIPTEN_FETCH)
 endif()
 
 ################################################################################
+# Instrumentation
+################################################################################
+
+# Linux and Windows
+option(USE_VTUNE_INSTRUMENTATION "Use Instrumentation and Tracing Technology (itt) for profiling in VTune" OFF)
+if (USE_VTUNE_INSTRUMENTATION)
+  message(STATUS "Configuring ittnotify")
+
+  include(FetchContent)
+  FetchContent_Declare(ittnotify
+          GIT_REPOSITORY https://github.com/intel/ittapi.git
+          GIT_TAG v3.28.2
+  )
+  FetchContent_MakeAvailable(ittnotify)
+
+  add_compile_definitions(USE_VTUNE_INSTRUMENTATION)
+endif ()
+
+################################################################################
 
 option(EMBED_PROJ_DATA_PATH "Whether the PROJ_DATA_PATH should be embedded" ON)
 

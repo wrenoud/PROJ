@@ -585,6 +585,7 @@ target_link_libraries (proj
   PRIVATE
     shell32.lib
     ole32.lib
+    $<$<BOOL:${USE_VTUNE_INSTRUMENTATION}>:ittnotify>
 )
 endif()
 if(UNIX)
